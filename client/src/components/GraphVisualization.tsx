@@ -258,11 +258,36 @@ export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisu
             'background-color': '#EC4899', // pink-500
             'line-color': '#EC4899',
             'target-arrow-color': '#EC4899',
+            'line-style': 'solid',
+            'line-cap': 'round',
             'transition-duration': 500,
             'border-width': 4,
             'border-color': '#ffffff',
+            'border-opacity': 1,
+            'text-opacity': 1,
             'z-index': 12,
-            'width': 4
+            'width': 6,           // Thicker edges
+            'arrow-scale': 1.5,   // Larger arrows
+            'curve-style': 'bezier',
+            'control-point-step-size': 80, // Smoother curves
+            'target-arrow-shape': 'triangle',
+            'target-distance-from-node': 10,
+            'source-distance-from-node': 5
+          }
+        },
+        {
+          selector: 'edge.path-highlight',
+          style: {
+            'label': '→',        // Add arrow symbol as label
+            'font-size': '20px',
+            'text-background-opacity': 0.7,
+            'text-background-color': '#ffffff',
+            'text-background-shape': 'roundrectangle',
+            'text-background-padding': '3px',
+            'text-valign': 'center',
+            'text-outline-width': 2,
+            'text-outline-color': '#ffffff',
+            'text-outline-opacity': 0.8
           }
         },
         {
@@ -278,8 +303,23 @@ export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisu
             'overlay-padding': 12,
             'overlay-opacity': 1,
             'transition-duration': 300,
-            'width': 45,
-            'height': 45
+            'width': 50,         // Larger current node
+            'height': 50,
+            'text-valign': 'bottom',
+            'text-halign': 'center',
+            'text-margin-y': 10,
+            'text-outline-width': 3,
+            'text-outline-color': '#ffffff',
+            'text-outline-opacity': 1
+          }
+        },
+        {
+          selector: 'node.current-node',
+          style: {
+            'content': 'data(label)\n▶',  // Add play icon under label
+            'text-transform': 'uppercase',
+            'font-weight': 'bold',
+            'text-max-width': '100px'
           }
         }
       ],
@@ -370,40 +410,59 @@ export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisu
       case 'force-directed':
         layoutConfig = {
           name: 'fcose',
-          idealEdgeLength: 100,
-          nodeRepulsion: 5000,
-          nodeOverlap: 20,
+          idealEdgeLength: 150,  // Increased for more spacing
+          nodeRepulsion: 8000,   // Increased to push nodes further apart
+          nodeOverlap: 30,       // Increased to prevent overlap
+          randomize: true,       // Start with randomized positions
+          padding: 50,           // Add padding around the layout
+          fit: true,             // Fit the viewport to the graph
           animationDuration: 1000,
+          quality: 'proof',      // Highest quality layout
         };
         break;
       case 'hierarchical':
         layoutConfig = {
           name: 'dagre',
-          rankDir: 'TB',
-          rankSep: 100,
-          nodeSep: 50,
+          rankDir: 'TB',         // Top to bottom direction
+          rankSep: 150,          // Increased vertical spacing
+          nodeSep: 100,          // Increased horizontal spacing
+          edgeSep: 80,           // Edge separation
+          ranker: 'network-simplex', // Better for code dependencies
           animationDuration: 1000,
         };
         break;
       case 'circular':
         layoutConfig = {
           name: 'circle',
+          radius: 250,           // Larger circle
+          startAngle: Math.PI / 2, // Start from top
+          sweep: 2 * Math.PI,    // Full circle
+          padding: 50,           // Padding
           animationDuration: 1000,
         };
         break;
       case 'grid':
         layoutConfig = {
           name: 'grid',
+          rows: undefined,       // Auto determine rows
+          cols: undefined,       // Auto determine columns
+          fit: true,             // Fit to viewport
+          padding: 30,           // Grid padding
+          avoidOverlap: true,    // Prevent node overlap
           animationDuration: 1000,
         };
         break;
       default:
         layoutConfig = {
           name: 'fcose',
-          idealEdgeLength: 100,
-          nodeRepulsion: 5000,
-          nodeOverlap: 20,
+          idealEdgeLength: 150,
+          nodeRepulsion: 8000,
+          nodeOverlap: 30,
+          randomize: true,
+          padding: 50,
+          fit: true,
           animationDuration: 1000,
+          quality: 'proof',
         };
     }
     
@@ -428,6 +487,6 @@ export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisu
   }));
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: 500 }} />
+    <div ref={containerRef} style={{ width: '100%', height: 650 }} />
   );
 });
