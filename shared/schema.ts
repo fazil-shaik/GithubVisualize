@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -62,6 +62,41 @@ export const insertDependencySchema = createInsertSchema(dependencies).pick({
   type: true,
 });
 
+// User table
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  email: text("email").notNull().unique(),
+  password: text("password").notNull(),
+  displayName: text("display_name"),
+  avatarUrl: text("avatar_url"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertUserSchema = createInsertSchema(users)
+  .pick({
+    username: true,
+    email: true,
+    password: true,
+    displayName: true,
+    avatarUrl: true,
+  });
+
+// User favorites
+export const userFavorites = pgTable("user_favorites", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  repositoryId: integer("repository_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertUserFavoriteSchema = createInsertSchema(userFavorites)
+  .pick({
+    userId: true,
+    repositoryId: true,
+  });
+
 // Graph data structure
 export const graphData = pgTable("graph_data", {
   id: serial("id").primaryKey(),
@@ -85,6 +120,12 @@ export type InsertFile = z.infer<typeof insertFileSchema>;
 
 export type Dependency = typeof dependencies.$inferSelect;
 export type InsertDependency = z.infer<typeof insertDependencySchema>;
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type UserFavorite = typeof userFavorites.$inferSelect;
+export type InsertUserFavorite = z.infer<typeof insertUserFavoriteSchema>;
 
 export type GraphData = typeof graphData.$inferSelect;
 export type InsertGraphData = z.infer<typeof insertGraphDataSchema>;
