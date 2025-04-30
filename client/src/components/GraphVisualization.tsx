@@ -1,9 +1,13 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import cytoscape from "cytoscape";
 import fcose from "cytoscape-fcose";
 import cola from "cytoscape-cola";
 import dagre from "cytoscape-dagre";
 import euler from "cytoscape-euler";
+
+export interface GraphVisualizationHandle {
+  animateWorkflowPath: (path: string[]) => void;
+}
 
 // Register layout extensions
 try {
@@ -38,17 +42,70 @@ interface GraphVisualizationProps {
   layout?: string;
   zoom?: number;
   onNodeClick?: (nodeId: string) => void;
+  workflowPaths?: Record<string, string[]>;
+  initialWorkflow?: string;
 }
 
-export function GraphVisualization({ 
+export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisualizationProps>(({
   nodes = [], 
   edges = [], 
   layout = 'force-directed',
   zoom = 1,
-  onNodeClick
-}: GraphVisualizationProps) {
+  onNodeClick,
+  workflowPaths = {},
+  initialWorkflow
+}, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
+  
+  // Function to animate code execution path through the graph
+  const animateWorkflowPath = (path: string[]) => {
+    if (!cyRef.current || !path.length) return;
+    
+    const cy = cyRef.current;
+    
+    // Reset any existing animations
+    cy.elements().removeClass('path-highlight current-node');
+    
+    const animateNextNode = (index = 0) => {
+      if (index >= path.length) return;
+      
+      const nodeId = path[index];
+      const node = cy.getElementById(nodeId);
+      
+      if (node.length) {
+        // Add current node highlight
+        node.addClass('current-node');
+        
+        // If not the first node, create edge animation from previous to current
+        if (index > 0) {
+          const prevNodeId = path[index - 1];
+          const edge = cy.edges(`[source="${prevNodeId}"][target="${nodeId}"]`);
+          
+          if (edge.length) {
+            edge.addClass('path-highlight');
+          }
+        }
+        
+        // Add all nodes in the path to the path-highlight class
+        path.slice(0, index + 1).forEach(id => {
+          cy.getElementById(id).addClass('path-highlight');
+        });
+        
+        // Animate to the next node after delay
+        setTimeout(() => {
+          node.removeClass('current-node');
+          animateNextNode(index + 1);
+        }, 500);
+      } else {
+        // Skip this node if not found
+        animateNextNode(index + 1);
+      }
+    };
+    
+    // Start the animation sequence
+    animateNextNode(0);
+  };
   
   // Initialize cytoscape instance and setup graph
   useEffect(() => {
@@ -194,6 +251,36 @@ export function GraphVisualization({
             'opacity': 0.3,
             'transition-duration': 500,
           }
+        },
+        {
+          selector: '.path-highlight',
+          style: {
+            'background-color': '#EC4899', // pink-500
+            'line-color': '#EC4899',
+            'target-arrow-color': '#EC4899',
+            'transition-duration': 500,
+            'border-width': 4,
+            'border-color': '#ffffff',
+            'z-index': 12,
+            'width': 4
+          }
+        },
+        {
+          selector: '.current-node',
+          style: {
+            'background-color': '#EF4444', // red-500
+            'border-width': 5,
+            'border-color': '#FECDD3', // red-200
+            'border-opacity': 1,
+            'text-opacity': 1,
+            'z-index': 13,
+            'overlay-color': 'rgba(239, 68, 68, 0.3)',
+            'overlay-padding': 12,
+            'overlay-opacity': 1,
+            'transition-duration': 300,
+            'width': 45,
+            'height': 45
+          }
         }
       ],
       layout: {
@@ -262,6 +349,19 @@ export function GraphVisualization({
     }
   }, [zoom]);
   
+  // Animate initial workflow if provided
+  useEffect(() => {
+    if (initialWorkflow && workflowPaths && Object.keys(workflowPaths).length > 0) {
+      const path = workflowPaths[initialWorkflow];
+      if (path && path.length > 0) {
+        // Wait for the layout to finish before starting animation
+        setTimeout(() => {
+          animateWorkflowPath(path);
+        }, 1500);
+      }
+    }
+  }, [initialWorkflow, workflowPaths, nodes, edges]);
+  
   // Function to apply different layouts
   const applyLayout = (cy: cytoscape.Core, layoutName: string) => {
     let layoutConfig: any; // Use any type to bypass TypeScript errors with layout options
@@ -322,7 +422,12 @@ export function GraphVisualization({
     layout.run();
   };
   
+  // Expose the animateWorkflowPath method to parent components
+  useImperativeHandle(ref, () => ({
+    animateWorkflowPath
+  }));
+
   return (
     <div ref={containerRef} style={{ width: '100%', height: 500 }} />
   );
-}
+});

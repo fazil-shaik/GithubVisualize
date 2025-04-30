@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { FileTree } from "@/components/FileTree";
-import { GraphVisualization } from "@/components/GraphVisualization";
+import { GraphVisualization, GraphVisualizationHandle } from "@/components/GraphVisualization";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 interface VisualizationPanelProps {
   nodes: any[];
@@ -24,6 +25,23 @@ export default function VisualizationPanel({ nodes, edges }: VisualizationPanelP
   const [graphDepth, setGraphDepth] = useState("all");
   const [selectedLayout, setSelectedLayout] = useState("force-directed");
   const [zoom, setZoom] = useState(1);
+  const [selectedWorkflow, setSelectedWorkflow] = useState<keyof typeof workflowPaths | null>(null);
+  const graphRef = useRef<GraphVisualizationHandle>(null);
+  
+  // Sample workflow paths for demonstration
+  const workflowPaths = {
+    'authentication': ['src/components/Button.tsx', 'src/hooks', 'src/utils'],
+    'data-fetching': ['src/utils', 'src/components/Card.tsx', 'src/components/Input.tsx'],
+    'form-submission': ['src/components/Input.tsx', 'src/components/Button.tsx', 'src/hooks'],
+  };
+  
+  // Function to animate a workflow path
+  const handleAnimateWorkflow = (workflow: keyof typeof workflowPaths) => {
+    setSelectedWorkflow(workflow);
+    if (graphRef.current && workflowPaths[workflow]) {
+      graphRef.current.animateWorkflowPath(workflowPaths[workflow]);
+    }
+  };
   
   // Sample file structure for demonstration
   const fileStructure = [
@@ -289,11 +307,49 @@ export const Button: React.FC<ButtonProps> = ({
             
             <div className="graph-container p-4 relative" id="graphContainer">
               <GraphVisualization 
+                ref={graphRef}
                 nodes={nodes} 
                 edges={edges} 
                 layout={selectedLayout}
                 zoom={zoom}
+                workflowPaths={workflowPaths}
+                initialWorkflow={selectedWorkflow || undefined}
               />
+            </div>
+          </div>
+          
+          {/* Workflow Animation Controls */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4 mb-6">
+            <div className="flex flex-col space-y-4">
+              <h3 className="text-lg font-semibold">Workflow Visualization</h3>
+              
+              <div className="text-sm text-slate-600 dark:text-slate-300">
+                Select a workflow to visualize the code execution path:
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(workflowPaths) as Array<keyof typeof workflowPaths>).map((workflow) => (
+                  <Button
+                    key={workflow}
+                    variant={selectedWorkflow === workflow ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleAnimateWorkflow(workflow)}
+                    className="flex items-center gap-1"
+                  >
+                    <i className="ri-route-line"></i>
+                    {workflow.replace(/-/g, ' ')}
+                  </Button>
+                ))}
+              </div>
+              
+              {selectedWorkflow && (
+                <div className="mt-2 text-sm">
+                  <div className="flex items-center text-amber-600 dark:text-amber-400">
+                    <i className="ri-information-line mr-1"></i>
+                    Animating the {selectedWorkflow.replace(/-/g, ' ')} workflow path
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           
