@@ -125,6 +125,19 @@ export function GraphVisualization({
             'border-color': '#fff',
             'border-opacity': 0.8,
             'text-opacity': 0.8,
+            'transition-property': 'background-color, border-color, border-width, width, height, position, opacity',
+            'transition-duration': 300,
+            'transition-timing-function': 'ease-in-out-quad',
+          }
+        },
+        {
+          selector: 'node.animating',
+          style: {
+            'transition-duration': 300,
+            'transition-timing-function': 'ease-in-out-cubic',
+            'border-width': 3,
+            'border-color': '#60A5FA',
+            'border-opacity': 1,
           }
         },
         {
@@ -136,6 +149,8 @@ export function GraphVisualization({
             'curve-style': 'bezier',
             'target-arrow-shape': 'triangle',
             'target-arrow-color': '#94A3B8',
+            'transition-property': 'line-color, opacity, width, target-arrow-color',
+            'transition-duration': 300,
           }
         },
         {
@@ -145,6 +160,10 @@ export function GraphVisualization({
             'border-color': '#F97316',
             'text-opacity': 1,
             'border-opacity': 1,
+            'z-index': 10,
+            'overlay-color': 'rgba(249, 115, 22, 0.2)',
+            'overlay-padding': 10,
+            'overlay-opacity': 1,
           }
         },
         {
@@ -154,6 +173,26 @@ export function GraphVisualization({
             'opacity': 1,
             'width': 3,
             'target-arrow-color': '#F97316',
+            'z-index': 9,
+          }
+        },
+        {
+          selector: '.highlighted',
+          style: {
+            'background-color': '#10B981',
+            'line-color': '#10B981',
+            'target-arrow-color': '#10B981',
+            'transition-duration': 500,
+            'border-width': 4,
+            'border-color': '#ffffff',
+            'z-index': 11,
+          }
+        },
+        {
+          selector: '.faded',
+          style: {
+            'opacity': 0.3,
+            'transition-duration': 500,
           }
         }
       ],
@@ -172,6 +211,31 @@ export function GraphVisualization({
       if (onNodeClick) {
         onNodeClick(node.id());
       }
+    });
+    
+    // Add hover effects for better dependency visualization
+    cy.on('mouseover', 'node', (e) => {
+      const node = e.target;
+      
+      // Get connected edges and their connected nodes
+      const connectedEdges = node.connectedEdges();
+      const connectedNodes = connectedEdges.connectedNodes().filter((n: any) => n.id() !== node.id());
+      
+      // Add highlighted class to the current node and its connections
+      node.addClass('highlighted');
+      connectedEdges.addClass('highlighted');
+      connectedNodes.addClass('highlighted');
+      
+      // Add faded class to all other elements
+      cy.elements()
+        .difference(node.union(connectedEdges).union(connectedNodes))
+        .addClass('faded');
+    });
+    
+    // Remove effects when mouse leaves
+    cy.on('mouseout', 'node', (e) => {
+      const node = e.target;
+      cy.elements().removeClass('highlighted faded');
     });
     
     // Apply the selected layout
@@ -243,8 +307,19 @@ export function GraphVisualization({
         };
     }
     
-    // Use the layout with the configuration
-    cy.layout(layoutConfig as cytoscape.LayoutOptions).run();
+    // Use the layout with the configuration and add animation
+    const layout = cy.layout(layoutConfig as cytoscape.LayoutOptions);
+    
+    // Add animation events for better visualization
+    layout.one('layoutstart', () => {
+      cy.nodes().addClass('animating');
+    });
+    
+    layout.one('layoutstop', () => {
+      cy.nodes().removeClass('animating');
+    });
+    
+    layout.run();
   };
   
   return (
