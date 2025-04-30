@@ -5,12 +5,12 @@ import session from 'express-session';
 import { scrypt, randomBytes, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
 import { storage } from './storage';
-import { User, InsertUser } from '@shared/schema';
+import { User as UserType, InsertUser } from '@shared/schema';
 import MemoryStore from 'memorystore';
 
 declare global {
   namespace Express {
-    interface User extends User {}
+    interface User extends UserType {}
   }
 }
 
@@ -69,7 +69,7 @@ export function setupAuth(app: Express): void {
   );
 
   // Serialize and deserialize user
-  passport.serializeUser((user, done) => {
+  passport.serializeUser((user: Express.User, done) => {
     done(null, user.id);
   });
 
@@ -121,11 +121,11 @@ export function setupAuth(app: Express): void {
 
   // Login endpoint
   app.post('/api/login', (req, res, next) => {
-    passport.authenticate('local', (err, user, info) => {
+    passport.authenticate('local', (err: any, user: any, info: any) => {
       if (err) return next(err);
       if (!user) return res.status(401).json({ message: info?.message || 'Authentication failed' });
 
-      req.login(user, (err) => {
+      req.login(user, (err: any) => {
         if (err) return next(err);
         // Remove password from response
         const { password, ...userWithoutPassword } = user;
@@ -150,7 +150,7 @@ export function setupAuth(app: Express): void {
       return res.status(401).json({ message: 'Not authenticated' });
     }
     // Remove password from response
-    const { password, ...userWithoutPassword } = req.user as User;
+    const { password, ...userWithoutPassword } = req.user as UserType;
     res.status(200).json(userWithoutPassword);
   });
 

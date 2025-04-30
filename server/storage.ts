@@ -86,7 +86,16 @@ export class MemStorage implements IStorage {
 
   async createRepository(repository: InsertRepository): Promise<Repository> {
     const id = this.currentRepoId++;
-    const newRepo: Repository = { ...repository, id };
+    const newRepo: Repository = { 
+      ...repository, 
+      id, 
+      description: repository.description || null,
+      lastAnalyzed: repository.lastAnalyzed || null,
+      starsCount: repository.starsCount || null,
+      forksCount: repository.forksCount || null,
+      language: repository.language || null,
+      branch: repository.branch || null
+    };
     this.repositories.set(id, newRepo);
     return newRepo;
   }
@@ -104,7 +113,13 @@ export class MemStorage implements IStorage {
 
   async createFile(file: InsertFile): Promise<File> {
     const id = this.currentFileId++;
-    const newFile: File = { ...file, id };
+    const newFile: File = { 
+      ...file, 
+      id, 
+      language: file.language || null,
+      size: file.size || null,
+      content: file.content || null
+    };
     this.files.set(id, newFile);
     return newFile;
   }
@@ -178,8 +193,8 @@ export class MemStorage implements IStorage {
 
   async createUser(user: InsertUser): Promise<User> {
     const id = this.currentUserId++;
-    const createdAt = new Date().toISOString();
-    const updatedAt = createdAt;
+    const createdAt = new Date();
+    const updatedAt = new Date();
     
     const newUser: User = { 
       ...user, 
@@ -205,7 +220,7 @@ export class MemStorage implements IStorage {
       ...user,
       ...userData,
       id,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date()
     };
     
     this.users.set(id, updatedUser);
@@ -231,7 +246,7 @@ export class MemStorage implements IStorage {
 
   async addUserFavorite(userFavorite: InsertUserFavorite): Promise<UserFavorite> {
     const id = this.currentUserFavoriteId++;
-    const createdAt = new Date().toISOString();
+    const createdAt = new Date();
     
     // Check if this favorite already exists
     const exists = Array.from(this.userFavorites.values()).find(
