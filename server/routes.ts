@@ -15,7 +15,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     server: httpServer, 
     path: '/ws',
     // Add CORS options that match the server's origin
-    verifyClient: (info) => {
+    verifyClient: (info: { origin: string; secure: boolean; req: any }) => {
       console.log('WebSocket connection attempt from:', info.origin);
       return true; // Accept all connections for now
     }

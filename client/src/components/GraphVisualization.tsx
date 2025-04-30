@@ -7,12 +7,12 @@ import euler from "cytoscape-euler";
 
 // Register layout extensions
 try {
-  // Check if the layouts are already registered to avoid re-registration
+  // Register extensions only once
   if (typeof cytoscape !== 'undefined') {
-    if (!cytoscape.prototype.hasRegisteredExtension('fcose')) cytoscape.use(fcose);
-    if (!cytoscape.prototype.hasRegisteredExtension('cola')) cytoscape.use(cola);
-    if (!cytoscape.prototype.hasRegisteredExtension('dagre')) cytoscape.use(dagre);
-    if (!cytoscape.prototype.hasRegisteredExtension('euler')) cytoscape.use(euler);
+    cytoscape.use(fcose);
+    cytoscape.use(cola);
+    cytoscape.use(dagre);
+    cytoscape.use(euler);
   }
 } catch (error) {
   console.error("Error registering Cytoscape extensions:", error);
@@ -54,23 +54,9 @@ export function GraphVisualization({
   useEffect(() => {
     if (!containerRef.current) return;
     
-    // If we don't have real data yet, create a sample graph
-    const sampleNodes = nodes.length > 0 ? nodes : [
-      { id: 'button', label: 'Button.tsx', type: 'file' },
-      { id: 'styles', label: 'styles.css', type: 'file' },
-      { id: 'utils', label: 'utils.ts', type: 'file' },
-      { id: 'icon', label: 'Icon.tsx', type: 'file' },
-      { id: 'theme', label: 'theme.ts', type: 'file' },
-      { id: 'types', label: 'types.ts', type: 'file' },
-    ];
-    
-    const sampleEdges = edges.length > 0 ? edges : [
-      { id: 'e1', source: 'button', target: 'styles', type: 'import' },
-      { id: 'e2', source: 'button', target: 'utils', type: 'import' },
-      { id: 'e3', source: 'button', target: 'icon', type: 'import' },
-      { id: 'e4', source: 'button', target: 'theme', type: 'import' },
-      { id: 'e5', source: 'theme', target: 'types', type: 'import' },
-    ];
+    // Use the provided nodes and edges or empty arrays if none
+    const nodeElements: Node[] = nodes.length > 0 ? nodes : [];
+    const edgeElements: Edge[] = (edges.length > 0 && nodes.length > 0) ? edges : [];
     
     const getNodeColor = (node: Node) => {
       switch (node.type) {
@@ -107,14 +93,14 @@ export function GraphVisualization({
     const cy = cytoscape({
       container: containerRef.current,
       elements: [
-        ...sampleNodes.map(node => ({
+        ...nodeElements.map(node => ({
           data: { 
             ...node,
             color: getNodeColor(node),
             size: getNodeSize(node)
           }
         })),
-        ...sampleEdges.map(edge => ({
+        ...edgeElements.map(edge => ({
           data: edge
         }))
       ],
@@ -214,7 +200,7 @@ export function GraphVisualization({
   
   // Function to apply different layouts
   const applyLayout = (cy: cytoscape.Core, layoutName: string) => {
-    let layoutConfig: cytoscape.LayoutOptions;
+    let layoutConfig: any; // Use any type to bypass TypeScript errors with layout options
     
     switch (layoutName) {
       case 'force-directed':
@@ -257,7 +243,8 @@ export function GraphVisualization({
         };
     }
     
-    cy.layout(layoutConfig).run();
+    // Use the layout with the configuration
+    cy.layout(layoutConfig as cytoscape.LayoutOptions).run();
   };
   
   return (
