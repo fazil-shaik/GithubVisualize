@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { FileTree } from "@/components/FileTree";
 import { GraphVisualization, GraphVisualizationHandle } from "@/components/GraphVisualization";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -7,10 +7,29 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { apiRequest } from "@/lib/queryClient";
+import { Node, Edge } from "@shared/schema";
 
 interface VisualizationPanelProps {
-  nodes: any[];
-  edges: any[];
+  nodes: Node[];
+  edges: Edge[];
+}
+
+interface FileDetails {
+  path: string;
+  language?: string;
+  linesCount: number;
+  imports: { path: string; type: string }[];
+  importedBy: { path: string; type: string }[];
+  content?: string;
+}
+
+interface FileItem {
+  id: string;
+  name: string;
+  type: 'file' | 'directory';
+  language?: string;
+  children?: FileItem[];
 }
 
 export default function VisualizationPanel({ nodes, edges }: VisualizationPanelProps) {
@@ -25,101 +44,204 @@ export default function VisualizationPanel({ nodes, edges }: VisualizationPanelP
   const [graphDepth, setGraphDepth] = useState("all");
   const [selectedLayout, setSelectedLayout] = useState("force-directed");
   const [zoom, setZoom] = useState(1);
-  const [selectedWorkflow, setSelectedWorkflow] = useState<keyof typeof workflowPaths | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<FileDetails | null>(null);
+  const [isLoadingFile, setIsLoadingFile] = useState(false);
+  const [selectedWorkflow, setSelectedWorkflow] = useState<string | null>(null);
   const graphRef = useRef<GraphVisualizationHandle>(null);
   
-  // Sample workflow paths for demonstration
-  const workflowPaths = {
-    'authentication': ['src/components/Button.tsx', 'src/hooks', 'src/utils'],
-    'data-fetching': ['src/utils', 'src/components/Card.tsx', 'src/components/Input.tsx'],
-    'form-submission': ['src/components/Input.tsx', 'src/components/Button.tsx', 'src/hooks'],
-  };
+  // Generate auto-detected workflow paths based on node dependencies
+  const workflowPaths = useMemo(() => {
+    // Only generate paths if we have nodes and edges
+    if (!nodes.length || !edges.length) return {};
+    
+    // Helper function to find entry points (files that are imported but don't import others)
+    const findEntryPoints = () => {
+      const importers = new Set(edges.map(e => e.source));
+      const importees = new Set(edges.map(e => e.target));
+      
+      // Entry points are files that are imported but don't import others
+      return Array.from(importees).filter(id => !importers.has(id));
+    };
+    
+    // Helper function to find UI components (usually have names containing specific patterns)
+    const findUIComponents = () => {
+      return nodes
+        .filter(node => 
+          node.type === 'file' && 
+          (node.label.includes('Button') || 
+           node.label.includes('Form') || 
+           node.label.includes('Input') || 
+           node.label.includes('Card') ||
+           node.label.includes('Modal') ||
+           node.label.includes('Dialog'))
+        )
+        .map(node => node.id);
+    };
+    
+    // Helper to find data fetching files (usually have utility functions or hooks)
+    const findDataFetchingFiles = () => {
+      return nodes
+        .filter(node => 
+          node.type === 'file' && 
+          (node.label.includes('api') || 
+           node.label.includes('fetch') || 
+           node.label.includes('http') || 
+           node.label.includes('axios') ||
+           node.label.includes('request'))
+        )
+        .map(node => node.id);
+    };
+    
+    // Build common workflow paths
+    const entryPoints = findEntryPoints();
+    const uiComponents = findUIComponents();
+    const dataFiles = findDataFetchingFiles();
+    
+    // Generate authentication workflow (if exists)
+    const authFiles = nodes
+      .filter(node => 
+        node.type === 'file' && 
+        (node.label.toLowerCase().includes('auth') || 
+         node.label.toLowerCase().includes('login') || 
+         node.label.toLowerCase().includes('user'))
+      )
+      .map(node => node.id);
+    
+    // Generate form submission workflow (if exists)
+    const formFiles = nodes
+      .filter(node => 
+        node.type === 'file' && 
+        (node.label.toLowerCase().includes('form') || 
+         node.label.toLowerCase().includes('input') || 
+         node.label.toLowerCase().includes('submit'))
+      )
+      .map(node => node.id);
+    
+    const paths: Record<string, string[]> = {};
+    
+    if (authFiles.length >= 2) {
+      paths['authentication'] = authFiles;
+    }
+    
+    if (dataFiles.length >= 2) {
+      paths['data-fetching'] = dataFiles;
+    }
+    
+    if (formFiles.length >= 2) {
+      paths['form-submission'] = formFiles;
+    }
+    
+    return paths;
+  }, [nodes, edges]);
   
   // Function to animate a workflow path
-  const handleAnimateWorkflow = (workflow: keyof typeof workflowPaths) => {
+  const handleAnimateWorkflow = (workflow: string) => {
     setSelectedWorkflow(workflow);
     if (graphRef.current && workflowPaths[workflow]) {
       graphRef.current.animateWorkflowPath(workflowPaths[workflow]);
     }
   };
   
-  // Sample file structure for demonstration
-  const fileStructure = [
-    {
-      id: 'src',
-      name: 'src',
-      type: 'directory',
-      children: [
-        {
-          id: 'components',
-          name: 'components',
-          type: 'directory',
-          children: [
-            { id: 'Button.tsx', name: 'Button.tsx', type: 'file', language: 'typescript' },
-            { id: 'Card.tsx', name: 'Card.tsx', type: 'file', language: 'typescript' },
-            { id: 'Input.tsx', name: 'Input.tsx', type: 'file', language: 'typescript' },
-          ],
-        },
-        {
-          id: 'hooks',
-          name: 'hooks',
-          type: 'directory',
-          children: [],
-        },
-        {
-          id: 'utils',
-          name: 'utils',
-          type: 'directory',
-          children: [],
-        },
-      ],
-    },
-    { id: 'package.json', name: 'package.json', type: 'file', language: 'json' },
-    { id: 'README.md', name: 'README.md', type: 'file', language: 'markdown' },
-  ];
-  
-  // Selected file details (simulated)
-  const selectedFile = {
-    path: 'src/components/Button.tsx',
-    language: 'typescript',
-    size: 1420, // bytes
-    linesCount: 142,
-    imports: [
-      { path: './styles.css', type: 'style' },
-      { path: '../utils.ts', type: 'utility' },
-      { path: './Icon.tsx', type: 'component' },
-      { path: '../theme.ts', type: 'utility' },
-    ],
-    importedBy: [
-      { path: '../components/Card.tsx', type: 'component' },
-      { path: '../components/Form.tsx', type: 'component' },
-      { path: '../pages/Login.tsx', type: 'page' },
-      { path: '../pages/Register.tsx', type: 'page' },
-    ],
-    content: `import React from 'react';
-import './styles.css';
-import { validateProps } from '../utils';
-import Icon from './Icon';
-import { useTheme } from '../theme';
-
-interface ButtonProps {
-  variant?: 'primary' | 'secondary' | 'outline';
-  size?: 'sm' | 'md' | 'lg';
-  disabled?: boolean;
-  children: React.ReactNode;
-  onClick?: () => void;
-}
-
-export const Button: React.FC<ButtonProps> = ({
-  variant = 'primary',
-  size = 'md',
-  disabled = false,
-  children,
-  onClick,
-}) => {
-  const theme = useTheme();
-  // More code...`
+  // Handle node selection
+  const handleNodeSelection = async (nodeId: string) => {
+    setSelectedNodeId(nodeId);
+    setIsLoadingFile(true);
+    
+    try {
+      // Get incoming and outgoing edges for this node
+      const imports = edges
+        .filter(edge => edge.source === nodeId)
+        .map(edge => ({ 
+          path: edge.target, 
+          type: nodes.find(n => n.id === edge.target)?.type || 'unknown' 
+        }));
+      
+      const importedBy = edges
+        .filter(edge => edge.target === nodeId)
+        .map(edge => ({ 
+          path: edge.source,
+          type: nodes.find(n => n.id === edge.source)?.type || 'unknown'
+        }));
+      
+      // Get file content if available
+      let content = "";
+      try {
+        const response = await apiRequest<{content: string}>(`/api/file-content?path=${encodeURIComponent(nodeId)}`);
+        content = response.content;
+      } catch (e) {
+        console.error("Could not fetch file content:", e);
+        content = "// File content not available";
+      }
+      
+      // Use node information from graph data
+      const selectedNode = nodes.find(n => n.id === nodeId);
+      
+      setSelectedFile({
+        path: nodeId,
+        language: selectedNode?.language,
+        linesCount: content.split('\n').length,
+        imports,
+        importedBy,
+        content
+      });
+    } catch (error) {
+      console.error("Error fetching file details:", error);
+    } finally {
+      setIsLoadingFile(false);
+    }
   };
+  
+  // Generate file tree structure from nodes
+  const fileStructure = useMemo<FileItem[]>(() => {
+    if (!nodes.length) return [];
+    
+    const fileMap = new Map<string, FileItem>();
+    const rootItems: FileItem[] = [];
+    
+    // First pass: create all file and directory nodes
+    nodes.forEach(node => {
+      const pathParts = node.id.split('/');
+      const name = pathParts[pathParts.length - 1];
+      const isDirectory = node.type === 'directory';
+      
+      const fileItem: FileItem = {
+        id: node.id,
+        name,
+        type: isDirectory ? 'directory' : 'file',
+        language: node.language,
+        children: isDirectory ? [] : undefined
+      };
+      
+      fileMap.set(node.id, fileItem);
+      
+      // If it's a top-level item, add to rootItems
+      if (pathParts.length === 1) {
+        rootItems.push(fileItem);
+      }
+    });
+    
+    // Second pass: build the tree hierarchy
+    nodes.forEach(node => {
+      const pathParts = node.id.split('/');
+      
+      // Skip top-level items
+      if (pathParts.length === 1) return;
+      
+      // Find the parent directory
+      const parentPath = pathParts.slice(0, -1).join('/');
+      const parent = fileMap.get(parentPath);
+      
+      if (parent && parent.children) {
+        const currentFile = fileMap.get(node.id);
+        if (currentFile) {
+          parent.children.push(currentFile);
+        }
+      }
+    });
+    
+    return rootItems;
+  }, [nodes]);
   
   const handleFileTypeChange = (type: keyof typeof fileTypes) => {
     setFileTypes(prev => ({
@@ -314,6 +436,7 @@ export const Button: React.FC<ButtonProps> = ({
                 zoom={zoom}
                 workflowPaths={workflowPaths}
                 initialWorkflow={selectedWorkflow || undefined}
+                onNodeClick={handleNodeSelection}
               />
             </div>
           </div>
