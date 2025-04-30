@@ -181,6 +181,87 @@ export class GitService {
     return files;
   }
   
+  async getRepositoryInfo(url: string): Promise<RepositoryInfo | null> {
+    try {
+      // Parse GitHub URL to extract owner and repo name
+      const urlMatch = url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+      if (!urlMatch) {
+        return null;
+      }
+      
+      const owner = urlMatch[1];
+      const repoName = urlMatch[2].replace('.git', '');
+      
+      // Get the repository hash
+      const repoHash = this.hashRepoUrl(url);
+      const repoDir = path.join(this.workDir, repoHash);
+      
+      // Check if the repository exists locally
+      try {
+        const stat = await fs.stat(repoDir);
+        if (!stat.isDirectory()) {
+          return null;
+        }
+      } catch (error) {
+        return null;
+      }
+      
+      // Get the current branch
+      let branch = 'main';
+      try {
+        const { stdout: branchOutput } = await execPromise(`git -C "${repoDir}" rev-parse --abbrev-ref HEAD`);
+        branch = branchOutput.trim();
+      } catch (error) {
+        console.error('Error getting branch:', error);
+      }
+      
+      // Create repository info object
+      const repoInfo: RepositoryInfo = {
+        url,
+        name: repoName,
+        owner,
+        localPath: repoDir,
+        branch,
+      };
+      
+      // Try to get additional information from package.json or README
+      try {
+        const packageJsonPath = path.join(repoDir, 'package.json');
+        const packageJsonContents = await fs.readFile(packageJsonPath, 'utf-8');
+        const packageJson = JSON.parse(packageJsonContents);
+        
+        if (packageJson.description) {
+          repoInfo.description = packageJson.description;
+        }
+        
+        // Determine language based on package.json
+        if (packageJson.devDependencies && packageJson.devDependencies.typescript) {
+          repoInfo.language = 'TypeScript';
+        } else {
+          repoInfo.language = 'JavaScript';
+        }
+      } catch (error) {
+        // package.json not found or invalid, try README
+        try {
+          const readmePath = path.join(repoDir, 'README.md');
+          const readmeContents = await fs.readFile(readmePath, 'utf-8');
+          const firstLine = readmeContents.split('\n')[0].replace(/[#\s]/g, '');
+          
+          if (!repoInfo.description && firstLine) {
+            repoInfo.description = firstLine;
+          }
+        } catch (readmeError) {
+          // README not found, ignore
+        }
+      }
+      
+      return repoInfo;
+    } catch (error) {
+      console.error('Error getting repository info:', error);
+      return null;
+    }
+  }
+  
   private getLanguageFromExtension(extension: string): string {
     const extensionMap: Record<string, string> = {
       'js': 'JavaScript',

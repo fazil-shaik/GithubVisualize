@@ -167,8 +167,13 @@ export default function VisualizationPanel({ nodes, edges }: VisualizationPanelP
       // Get file content if available
       let content = "";
       try {
-        const response = await apiRequest<{content: string}>(`/api/file-content?path=${encodeURIComponent(nodeId)}`);
-        content = response.content;
+        const response = await fetch(`/api/file-content?path=${encodeURIComponent(nodeId)}`);
+        if (response.ok) {
+          const data = await response.json();
+          content = data.content || "// File content not available";
+        } else {
+          content = "// File content not available";
+        }
       } catch (e) {
         console.error("Could not fetch file content:", e);
         content = "// File content not available";
@@ -477,51 +482,87 @@ export default function VisualizationPanel({ nodes, edges }: VisualizationPanelP
           </div>
           
           {/* Selected Node Details */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">
-                File Details: <span className="text-primary-600 dark:text-primary-400 font-mono">{selectedFile.path}</span>
-              </h2>
-              <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400">
-                <span><i className="ri-scales-line mr-1"></i> {selectedFile.linesCount} lines</span>
-                <span><i className="ri-link-m mr-1"></i> {selectedFile.imports.length} imports</span>
-                <span><i className="ri-link-unlink-m mr-1"></i> {selectedFile.importedBy.length} imported by</span>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-sm font-medium mb-2 text-slate-600 dark:text-slate-300">Imports</h3>
-                <ul className="space-y-2 text-sm">
-                  {selectedFile.imports.map((imp, index) => (
-                    <li key={index} className="flex items-center">
-                      <i className="ri-arrow-right-line mr-2 text-primary-500"></i>
-                      <a href="#" className="text-primary-600 dark:text-primary-400 hover:underline font-mono text-xs">{imp.path}</a>
-                    </li>
-                  ))}
-                </ul>
+          {selectedFile ? (
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">
+                  File Details: <span className="text-primary-600 dark:text-primary-400 font-mono">{selectedFile.path}</span>
+                </h2>
+                <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400">
+                  <span><i className="ri-scales-line mr-1"></i> {selectedFile.linesCount} lines</span>
+                  <span><i className="ri-link-m mr-1"></i> {selectedFile.imports.length} imports</span>
+                  <span><i className="ri-link-unlink-m mr-1"></i> {selectedFile.importedBy.length} imported by</span>
+                </div>
               </div>
               
-              <div>
-                <h3 className="text-sm font-medium mb-2 text-slate-600 dark:text-slate-300">Imported By</h3>
-                <ul className="space-y-2 text-sm">
-                  {selectedFile.importedBy.map((imp, index) => (
-                    <li key={index} className="flex items-center">
-                      <i className="ri-arrow-left-line mr-2 text-orange-500"></i>
-                      <a href="#" className="text-primary-600 dark:text-primary-400 hover:underline font-mono text-xs">{imp.path}</a>
-                    </li>
-                  ))}
-                </ul>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-sm font-medium mb-2 text-slate-600 dark:text-slate-300">Imports</h3>
+                  {selectedFile.imports.length > 0 ? (
+                    <ul className="space-y-2 text-sm">
+                      {selectedFile.imports.map((imp, index) => (
+                        <li key={index} className="flex items-center">
+                          <i className="ri-arrow-right-line mr-2 text-primary-500"></i>
+                          <a 
+                            href="#" 
+                            className="text-primary-600 dark:text-primary-400 hover:underline font-mono text-xs"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleNodeSelection(imp.path);
+                            }}
+                          >
+                            {imp.path}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-slate-500">No imports found</p>
+                  )}
+                </div>
+                
+                <div>
+                  <h3 className="text-sm font-medium mb-2 text-slate-600 dark:text-slate-300">Imported By</h3>
+                  {selectedFile.importedBy.length > 0 ? (
+                    <ul className="space-y-2 text-sm">
+                      {selectedFile.importedBy.map((imp, index) => (
+                        <li key={index} className="flex items-center">
+                          <i className="ri-arrow-left-line mr-2 text-orange-500"></i>
+                          <a 
+                            href="#" 
+                            className="text-primary-600 dark:text-primary-400 hover:underline font-mono text-xs"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleNodeSelection(imp.path);
+                            }}
+                          >
+                            {imp.path}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-slate-500">This file is not imported by other files</p>
+                  )}
+                </div>
+              </div>
+              
+              <div className="mt-6">
+                <h3 className="text-sm font-medium mb-2 text-slate-600 dark:text-slate-300">Code Preview</h3>
+                <div className="bg-slate-800 rounded-md p-4 font-mono text-xs text-slate-200 overflow-x-auto">
+                  <pre>{selectedFile.content}</pre>
+                </div>
               </div>
             </div>
-            
-            <div className="mt-6">
-              <h3 className="text-sm font-medium mb-2 text-slate-600 dark:text-slate-300">Code Preview</h3>
-              <div className="bg-slate-800 rounded-md p-4 font-mono text-xs text-slate-200 overflow-x-auto">
-                <pre>{selectedFile.content}</pre>
-              </div>
+          ) : (
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 flex flex-col items-center justify-center text-center">
+              <i className="ri-file-list-line text-4xl text-slate-400 mb-3"></i>
+              <h3 className="text-lg font-medium text-slate-700 dark:text-slate-300 mb-2">Select a file to view details</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md">
+                Click on any node in the graph to view its dependencies, imports, and code content
+              </p>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </section>

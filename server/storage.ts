@@ -8,6 +8,7 @@ export interface IStorage {
   // Repository methods
   getRepository(id: number): Promise<Repository | undefined>;
   getRepositoryByUrl(url: string): Promise<Repository | undefined>;
+  getAllRepositories(): Promise<Repository[]>;
   createRepository(repository: InsertRepository): Promise<Repository>;
   
   // File methods
@@ -56,6 +57,10 @@ export class MemStorage implements IStorage {
     return Array.from(this.repositories.values()).find(
       (repo) => repo.url === url
     );
+  }
+  
+  async getAllRepositories(): Promise<Repository[]> {
+    return Array.from(this.repositories.values());
   }
 
   async createRepository(repository: InsertRepository): Promise<Repository> {

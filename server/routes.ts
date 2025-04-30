@@ -297,6 +297,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Internal server error' });
     }
   });
+  
+  // Get file content directly by path
+  app.get('/api/file-content', async (req, res) => {
+    try {
+      const path = req.query.path as string;
+      
+      if (!path) {
+        return res.status(400).json({ message: 'Path parameter is required' });
+      }
+      
+      // Get all repositories
+      const repositories = await storage.getAllRepositories();
+      let fileContent = '';
+      let found = false;
+      
+      // Look in each repository for the file
+      for (const repo of repositories) {
+        try {
+          const file = await storage.getFileByPath(repo.id, path);
+          if (file) {
+            fileContent = file.content || '// File content not available';
+            found = true;
+            break;
+          }
+        } catch (e) {
+          // Continue to the next repository
+          continue;
+        }
+      }
+      
+      if (!found) {
+        // Try to read from the filesystem as a fallback
+        try {
+          const fs = require('fs');
+          const gitServiceModule = await import('./gitService');
+          const gitService = new gitServiceModule.GitService();
+          
+          // Look for the file in active repositories
+          for (const repo of repositories) {
+            const repoInfo = await gitService.getRepositoryInfo(repo.url);
+            if (repoInfo && repoInfo.localPath) {
+              const filePath = `${repoInfo.localPath}/${path}`;
+              if (fs.existsSync(filePath)) {
+                fileContent = fs.readFileSync(filePath, 'utf8');
+                found = true;
+                break;
+              }
+            }
+          }
+        } catch (fsError) {
+          console.error('Error reading file from filesystem:', fsError);
+        }
+      }
+      
+      if (!found) {
+        return res.status(404).json({ 
+          message: 'File not found',
+          content: '// File not found'
+        });
+      }
+      
+      res.status(200).json({
+        content: fileContent
+      });
+      
+    } catch (error) {
+      console.error('Error fetching file content:', error);
+      res.status(500).json({ 
+        message: 'Internal server error',
+        content: '// Error loading file content'
+      });
+    }
+  });
 
   return httpServer;
 }
