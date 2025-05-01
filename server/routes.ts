@@ -6,6 +6,7 @@ import { CodeAnalyzer } from "./codeAnalyzer";
 import { WebSocketServer, WebSocket } from "ws";
 import { z } from "zod";
 import { AnalysisStatus, RepositoryAnalysisRequest } from "@shared/schema";
+import { setupAuth } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
